@@ -490,7 +490,7 @@ export default function App() {
   // Delete handlers
   const handleDeleteOne = useCallback(async (id) => {
     try {
-      const resp = await fetch(`http://localhost:8000/api/competitors/${id}`, { method: 'DELETE' });
+      const resp = await fetch(`https://synapse-multiagent-system.onrender.com/api/competitors/${id}`, { method: 'DELETE' });
       if (!resp.ok) throw new Error('Delete failed');
       setCompetitors(prev => prev.filter(c => c.id !== id));
       showNotification('Competitor record deleted.', 'success');
@@ -501,7 +501,7 @@ export default function App() {
 
   const handleDeleteBulk = useCallback(async (ids) => {
     try {
-      const resp = await fetch('http://localhost:8000/api/competitors/bulk-delete', { 
+      const resp = await fetch('https://synapse-multiagent-system.onrender.com/api/competitors/bulk-delete', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids })
@@ -516,7 +516,7 @@ export default function App() {
 
   const handleDeleteAll = useCallback(async () => {
     try {
-      const resp = await fetch('http://localhost:8000/api/competitors/delete-all', { method: 'POST' });
+      const resp = await fetch('https://synapse-multiagent-system.onrender.com/api/competitors/delete-all', { method: 'POST' });
       if (!resp.ok) throw new Error('Delete all failed');
       setCompetitors([]);
       showNotification('All competitor records have been purged.', 'success');
@@ -527,7 +527,7 @@ export default function App() {
 
   const handleResetAnalytics = useCallback(async () => {
     try {
-      const resp = await fetch('http://localhost:8000/api/competitors/delete-all', { method: 'POST' });
+      const resp = await fetch('https://synapse-multiagent-system.onrender.com/api/competitors/delete-all', { method: 'POST' });
       if (!resp.ok) throw new Error('Reset failed');
       setCompetitors([]);
       showNotification('Analytics data has been reset.', 'success');
