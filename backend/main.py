@@ -306,19 +306,31 @@ async def analyze_niche(request: AnalyzeRequest):
         snippet = res["snippet"]
 
         # Run real NLTK VADER sentiment on the scraped snippet
-        sentiment = analyze_sentiment([snippet]) if snippet else 0.0
+        try:
+            sentiment = analyze_sentiment([snippet]) if snippet else 0.0
+        except Exception as e:
+            print(f"[Synapse] Sentiment analysis failed (NLTK error?): {e}")
+            sentiment = 0.5  # Neutral fallback
 
         # Generate deterministic pricing based on real URL hash
         prices = _generate_deterministic_prices(url)
         fallback_price = prices[-1]
 
         # Async extraction of pricing tiers
-        min_price, max_price = await extract_pricing_tiers(url, default_price=fallback_price)
+        try:
+            min_price, max_price = await extract_pricing_tiers(url, default_price=fallback_price)
+        except Exception as e:
+            print(f"[Synapse] Price extraction failed: {e}")
+            min_price, max_price = fallback_price, fallback_price
         
         # Keep current_price as the minimum for charting consistency
         current_price = min_price
         
-        predicted_price = predict_next_price(prices)
+        try:
+            predicted_price = predict_next_price(prices)
+        except Exception as e:
+            print(f"[Synapse] Price prediction failed: {e}")
+            predicted_price = current_price
 
         row_id = str(uuid.uuid4())
         row = {
