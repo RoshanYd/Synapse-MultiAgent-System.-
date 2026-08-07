@@ -398,7 +398,20 @@ async def delete_all_competitors():
     """Delete ALL competitor records from the database."""
     try:
         # Supabase requires a filter, so we use a non-null id condition to match all rows
-        supabase.table("competitor_metrics").delete().neq("id", "").execute()
+        supabase.table("competitor_metrics").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+        return {"status": "success", "message": "All competitor records deleted"}
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete all competitors: {str(exc)}",
+        )
+
+
+@app.post("/api/competitors/delete-all")
+async def delete_all_competitors_post():
+    """Delete ALL competitor records — POST variant for safer browser compatibility."""
+    try:
+        supabase.table("competitor_metrics").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
         return {"status": "success", "message": "All competitor records deleted"}
     except Exception as exc:
         raise HTTPException(

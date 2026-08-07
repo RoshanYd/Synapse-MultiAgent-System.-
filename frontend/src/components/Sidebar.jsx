@@ -35,6 +35,16 @@ const NAV_ITEMS = [
     ),
   },
   {
+    id: 'about',
+    label: 'About',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
     id: 'settings',
     label: 'Settings',
     icon: (
@@ -48,18 +58,44 @@ const NAV_ITEMS = [
   },
 ];
 
+// Inline SVG Logo Component matching the user's provided brand mark
+function SynapseLogo() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 90" className="w-9 h-9">
+      <defs>
+        <linearGradient id="sidebarNeonBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#00f0ff" />
+          <stop offset="100%" stopColor="#74B4D9" />
+        </linearGradient>
+        <filter id="sidebarGlow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+      </defs>
+      {/* Structural Hexagon */}
+      <path d="M10 45 L 35 10 L 65 10 L 90 45 L 65 80 L 35 80 Z" 
+            fill="none" stroke="url(#sidebarNeonBlue)" strokeWidth="2" 
+            strokeLinejoin="round" opacity="0.3"/>
+      {/* Active Data Trajectory */}
+      <path d="M10 45 L 45 25 L 65 65 L 90 35" 
+            fill="none" stroke="url(#sidebarNeonBlue)" strokeWidth="4" 
+            strokeLinecap="round" strokeLinejoin="round" filter="url(#sidebarGlow)"/>
+      {/* Data Nodes */}
+      <circle cx="10" cy="45" r="5" fill="#007F5F" filter="url(#sidebarGlow)"/>
+      <circle cx="45" cy="25" r="4" fill="#00f0ff" />
+      <circle cx="65" cy="65" r="5" fill="#007F5F" filter="url(#sidebarGlow)"/>
+      <circle cx="90" cy="35" r="4" fill="#EBEBEB" />
+    </svg>
+  );
+}
+
 export default function Sidebar({ activeView, onViewChange }) {
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-slate-900/80 backdrop-blur-xl border-r border-slate-700/40 flex flex-col z-50">
       {/* Brand */}
       <div className="px-6 py-6 border-b border-slate-700/30">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-electric-blue to-emerald-accent flex items-center justify-center shadow-glow-blue">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
+          <SynapseLogo />
           <div>
             <h1 className="text-sm font-bold text-white tracking-wide">SYNAPSE</h1>
             <p className="text-[10px] font-medium text-slate-400 tracking-widest uppercase">Analytics Engine</p>

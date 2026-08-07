@@ -1,80 +1,74 @@
 # Synapse Analytics Engine
 
-Synapse Analytics Engine is a full-stack, AI-augmented business intelligence platform. It transitions the standard "data dashboard" into an **Active Business Deployment Engine** by scraping live competitor intelligence, analyzing market sentiment, and computing deterministic launch strategies.
+Synapse Analytics Engine is a deterministic, AI-augmented business intelligence platform that transforms raw web data into actionable launch strategies. Built for modern competitive reconnaissance, it allows users to mine real-time pricing and sentiment metrics from live search engines to confidently position products and launch in new niches.
 
-## Key Features
+## Core Features
+- **Live Reconnaissance**: Direct parsing of DuckDuckGo results for fast, real-time competitor tracking.
+- **Lexical Sentiment (NLTK)**: Objective polarity scoring of competitor web messaging using VADER sentiment analysis.
+- **Predictive Pricing (ML)**: Forecasts competitor pricing trajectories based on simulated historical time-series data using Scikit-Learn linear regression.
+- **Rule-Based Strategy**: Formulates precise market entry recommendations using an internal deterministic SWOT engine.
+- **Data Persistence**: Backed by a high-performance PostgreSQL (Supabase) database with real-time UI synchronization.
 
-- **Live Competitor Intelligence**: Uses DuckDuckGo HTML scraping to find real competitors for any business niche in real-time, bypassing the need for third-party API keys.
-- **Automated Pricing Tier Extraction**: Asynchronously extracts minimum and maximum pricing tiers directly from competitor websites.
-- **Rule-Based SWOT Engine**: Analyzes market sentiment (via NLTK VADER) and pricing (via Scikit-Learn/Linear Regression) to generate a deterministic 2x2 SWOT matrix without relying on expensive LLMs.
-- **Financial Simulator**: An interactive tool to calculate break-even volumes based on dynamic pricing thresholds.
-- **Supabase Integration**: Uses Supabase Postgres database and Realtime websockets to sync data instantly to the dashboard.
+## Architecture & Tech Stack
+**Frontend:** React (Vite), TailwindCSS, custom UI components.
+**Backend:** FastAPI (Python), NLTK, Scikit-learn, BeautifulSoup4.
+**Database:** Supabase (PostgreSQL).
 
-## Tech Stack
+## Project Setup & How to Run
 
-- **Frontend**: React (Vite), TailwindCSS, Recharts for visualizations.
-- **Backend**: Python (FastAPI), BeautifulSoup4, NLTK, Scikit-Learn.
-- **Database**: Supabase (PostgreSQL).
+### 1. Prerequisites
+- Python 3.10+
+- Node.js (v18+)
+- Supabase account (or local instance)
 
----
+### 2. Environment Variables
+You will need `.env` files in both the frontend and backend directories.
 
-## How to Run the Project Locally
+**Frontend (`frontend/.env`)**:
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-### 1. Database Setup (Supabase)
-1. Ensure you have a Supabase project created.
-2. Run the SQL migrations found in the `supabase/` folder (`migration_01.sql` through `migration_04.sql`) in your Supabase SQL Editor.
-3. Obtain your Supabase Project URL and Anon Key.
+**Backend (`backend/.env`)**:
+```env
+SUPABASE_URL=your_supabase_url
+SUPABASE_KEY=your_supabase_anon_key
+```
 
-### 2. Backend Setup (FastAPI)
-The backend requires Python 3.10+ and a virtual environment.
+### 3. Running the Backend Server
+The backend leverages Python's FastAPI framework and provides the scraping/analytics engine.
 
 ```bash
+# 1. Navigate to backend directory
 cd backend
+
+# 2. Create and activate a virtual environment (Windows)
 python -m venv venv
-
-# Activate the virtual environment:
-# On Windows:
 .\venv\Scripts\activate
-# On Mac/Linux:
-source venv/bin/activate
 
-# Install dependencies
+# 3. Install dependencies
 pip install -r requirements.txt
 
-# Environment variables
-# Ensure you have a .env file in the backend directory with:
-# SUPABASE_URL=your_url
-# SUPABASE_KEY=your_key
-
-# Run the backend server
+# 4. Run the Uvicorn dev server
 uvicorn main:app --reload --port 8000
 ```
-*The backend will be running at `http://127.0.0.1:8000`*
+> The API will now be available at `http://localhost:8000`
 
-### 3. Frontend Setup (React/Vite)
-The frontend requires Node.js (v16+ recommended).
+### 4. Running the Frontend Server
+The frontend is a fast React Single Page Application built with Vite.
 
 ```bash
+# 1. Navigate to frontend directory
 cd frontend
 
-# Install dependencies
+# 2. Install node modules
 npm install
 
-# Environment variables
-# Ensure you have a .env file in the frontend directory with:
-# VITE_SUPABASE_URL=your_url
-# VITE_SUPABASE_ANON_KEY=your_key
-
-# Run the frontend development server
+# 3. Start the Vite dev server
 npm run dev
 ```
-*The frontend will be running at `http://localhost:5173`*
+> The application will now be available at `http://localhost:5173`
 
----
-
-## Usage
-
-1. Open `http://localhost:5173` in your browser.
-2. In the "Competitor Intelligence" section on the Dashboard, enter a business niche (e.g., "CRM Software" or "Email Marketing") and click **Analyze Niche**.
-3. The backend will scrape the web, extract pricing tiers, run sentiment analysis, and populate your dashboard with competitive insights.
-4. Navigate to the **Niche Launchpad Engine** tab to see your generated SWOT analysis and Execution Roadmap!
+### 5. Accessing the Platform
+With both servers running, open your browser and navigate to `http://localhost:5173` to access the Synapse Analytics Engine dashboard.
