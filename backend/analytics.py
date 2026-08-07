@@ -3,20 +3,31 @@ Synapse Analytics Engine — Core Analytics Module
 Deterministic NLP sentiment + ML price prediction (zero LLM dependency).
 """
 
+import os
 import nltk
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
 # ---------------------------------------------------------------------------
-# NLTK VADER bootstrap — downloads lexicon data on first run
+# NLTK VADER bootstrap — use /tmp for cloud environments (Render, etc.)
 # ---------------------------------------------------------------------------
-nltk.download("vader_lexicon", quiet=True)
+_NLTK_DATA_DIR = os.path.join(os.environ.get("TMPDIR", "/tmp"), "nltk_data")
+os.makedirs(_NLTK_DATA_DIR, exist_ok=True)
+nltk.data.path.insert(0, _NLTK_DATA_DIR)
 
-_sia = SentimentIntensityAnalyzer()
+_sia = None
+try:
+    nltk.download("vader_lexicon", download_dir=_NLTK_DATA_DIR, quiet=True)
+    from nltk.sentiment.vader import SentimentIntensityAnalyzer
+    _sia = SentimentIntensityAnalyzer()
+    print("[Synapse] NLTK VADER initialized successfully.")
+except Exception as e:
+    print(f"[Synapse] WARNING: NLTK VADER failed to initialize: {e}")
+    print("[Synapse] Falling back to simple keyword-based sentiment.")
 
 
 def analyze_sentiment(reviews: list[str]) -> float:
     """
     Compute the mean VADER compound sentiment score across a list of reviews.
+    Falls back to simple keyword-based analysis if NLTK is unavailable.
 
     Args:
         reviews: List of review/feedback text strings.
@@ -29,10 +40,29 @@ def analyze_sentiment(reviews: list[str]) -> float:
     if not reviews:
         return 0.0
 
-    compound_scores = [
-        _sia.polarity_scores(review)["compound"] for review in reviews
-    ]
-    return round(sum(compound_scores) / len(compound_scores), 4)
+    if _sia is not None:
+        # Use real NLTK VADER
+        compound_scores = [
+            _sia.polarity_scores(review)["compound"] for review in reviews
+        ]
+        return round(sum(compound_scores) / len(compound_scores), 4)
+    else:
+        # Simple keyword-based fallback
+        positive_words = {"great", "excellent", "best", "amazing", "love", "perfect", "awesome",
+                         "fantastic", "outstanding", "reliable", "powerful", "innovative", "leading"}
+        negative_words = {"bad", "worst", "terrible", "hate", "poor", "awful", "broken",
+                         "expensive", "slow", "buggy", "frustrating", "disappointing"}
+        scores = []
+        for review in reviews:
+            words = set(review.lower().split())
+            pos = len(words & positive_words)
+            neg = len(words & negative_words)
+            total = pos + neg
+            if total == 0:
+                scores.append(0.1)  # Slightly positive default
+            else:
+                scores.append(round((pos - neg) / total, 4))
+        return round(sum(scores) / len(scores), 4)
 
 
 def predict_next_price(historical_prices: list[float]) -> float:

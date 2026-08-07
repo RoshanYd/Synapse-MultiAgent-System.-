@@ -114,6 +114,7 @@ def scrape_duckduckgo(query: str, max_results: int = 5) -> list[dict]:
     Returns a list of dicts with keys: title, url, snippet.
     """
     search_url = "https://html.duckduckgo.com/html/"
+    results = []
     
     try:
         resp = httpx.post(
@@ -246,122 +247,122 @@ async def analyze_niche(request: AnalyzeRequest):
     Analyze a business niche: LIVE Web scraping via DuckDuckGo HTML.
     Extracts top URLs, parses text for sentiment, predicts pricing via pure math.
     """
-    niche = request.niche.strip()
-    if not niche:
-        raise HTTPException(status_code=400, detail="Niche cannot be empty.")
-
-    competitors: list[CompetitorResult] = []
-    rows_to_insert: list[dict] = []
-
-    # 1. LIVE SEARCH: Scrape real competitors from DuckDuckGo
-    # We use negative keywords to block SEO listicles and force DDG to show actual product pages
-    search_query = f"{niche} software -top -best -list -review"
-    print(f"[Synapse] Searching DuckDuckGo for: {search_query}")
+    import traceback
     
-    # Get more results to give us room to filter
-    search_results = scrape_duckduckgo(search_query, max_results=15)
-    print(f"[Synapse] Found {len(search_results)} raw results")
+    try:
+        niche = request.niche.strip()
+        if not niche:
+            raise HTTPException(status_code=400, detail="Niche cannot be empty.")
 
-    if not search_results:
-        # Fallback: try a broader search
-        search_query = f"{niche} platform -top -best"
-        print(f"[Synapse] Retrying with: {search_query}")
+        competitors: list[CompetitorResult] = []
+        rows_to_insert: list[dict] = []
+
+        # 1. LIVE SEARCH: Scrape real competitors from DuckDuckGo
+        search_query = f"{niche} software -top -best -list -review"
+        print(f"[Synapse] Searching DuckDuckGo for: {search_query}")
+        
         search_results = scrape_duckduckgo(search_query, max_results=15)
-        print(f"[Synapse] Retry found {len(search_results)} results")
+        print(f"[Synapse] Found {len(search_results)} raw results")
 
-    # Known review sites and publishers to exclude
-    EXCLUDED_DOMAINS = {
-        "g2.com", "capterra.com", "trustradius.com", "softwareadvice.com", 
-        "gartner.com", "forbes.com", "techradar.com", "pcmag.com", 
-        "nytimes.com", "emergenresearch.com", "beebom.com", 
-        "influencermarketinghub.com", "thebigmarketing.com", "marketing-tip.com", 
-        "value.today", "athletechnews.com", "inven.ai", "wikipedia.org", 
-        "investopedia.com", "yahoofinance.com", "bloomberg.com", "cnbc.com",
-        "techcrunch.com", "wired.com", "fool.com", "seekingalpha.com",
-        "producthunt.com", "alternativeto.net", "getapp.com", "trustpilot.com"
-    }
+        if not search_results:
+            search_query = f"{niche} platform -top -best"
+            print(f"[Synapse] Retrying with: {search_query}")
+            search_results = scrape_duckduckgo(search_query, max_results=15)
+            print(f"[Synapse] Retry found {len(search_results)} results")
 
-    # 2. Process the scraped results (take top 3 actual competitors)
-    seen_domains: set[str] = set()
-    for res in search_results:
-        if len(competitors) >= 3:
-            break
-
-        url = res["url"]
-        parsed_url = urlparse(url)
-        domain = parsed_url.netloc.lower()
-        if domain.startswith("www."):
-            domain = domain[4:]
-
-        # Filter out known review sites and news publishers
-        if any(ex in domain for ex in EXCLUDED_DOMAINS):
-            continue
-
-        # Skip duplicate domains
-        if domain in seen_domains:
-            continue
-        seen_domains.add(domain)
-
-        name = _clean_company_name(res["title"])
-        snippet = res["snippet"]
-
-        # Run real NLTK VADER sentiment on the scraped snippet
-        try:
-            sentiment = analyze_sentiment([snippet]) if snippet else 0.0
-        except Exception as e:
-            print(f"[Synapse] Sentiment analysis failed (NLTK error?): {e}")
-            sentiment = 0.5  # Neutral fallback
-
-        # Generate deterministic pricing based on real URL hash
-        prices = _generate_deterministic_prices(url)
-        fallback_price = prices[-1]
-
-        # Async extraction of pricing tiers
-        try:
-            min_price, max_price = await extract_pricing_tiers(url, default_price=fallback_price)
-        except Exception as e:
-            print(f"[Synapse] Price extraction failed: {e}")
-            min_price, max_price = fallback_price, fallback_price
-        
-        # Keep current_price as the minimum for charting consistency
-        current_price = min_price
-        
-        try:
-            predicted_price = predict_next_price(prices)
-        except Exception as e:
-            print(f"[Synapse] Price prediction failed: {e}")
-            predicted_price = current_price
-
-        row_id = str(uuid.uuid4())
-        row = {
-            "id": row_id,
-            "business_niche": niche,
-            "company_name": name,
-            "website_url": url,
-            "current_price": current_price,
-            "min_price": min_price,
-            "max_price": max_price,
-            "sentiment_score": sentiment,
-            "predicted_next_price": predicted_price,
-            "historical_prices": prices,
+        # Known review sites and publishers to exclude
+        EXCLUDED_DOMAINS = {
+            "g2.com", "capterra.com", "trustradius.com", "softwareadvice.com", 
+            "gartner.com", "forbes.com", "techradar.com", "pcmag.com", 
+            "nytimes.com", "emergenresearch.com", "beebom.com", 
+            "influencermarketinghub.com", "thebigmarketing.com", "marketing-tip.com", 
+            "value.today", "athletechnews.com", "inven.ai", "wikipedia.org", 
+            "investopedia.com", "yahoofinance.com", "bloomberg.com", "cnbc.com",
+            "techcrunch.com", "wired.com", "fool.com", "seekingalpha.com",
+            "producthunt.com", "alternativeto.net", "getapp.com", "trustpilot.com"
         }
 
-        rows_to_insert.append(row)
-        competitors.append(CompetitorResult(**row))
+        # 2. Process the scraped results (take top 3 actual competitors)
+        seen_domains: set[str] = set()
+        for res in search_results:
+            if len(competitors) >= 3:
+                break
 
-    print(f"[Synapse] Processed {len(competitors)} unique competitors")
+            url = res["url"]
+            parsed_url = urlparse(url)
+            domain = parsed_url.netloc.lower()
+            if domain.startswith("www."):
+                domain = domain[4:]
 
-    # 3. Write to Supabase
-    if rows_to_insert:
-        try:
-            supabase.table("competitor_metrics").insert(rows_to_insert).execute()
-        except Exception as exc:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to write to Supabase: {str(exc)}",
-            )
+            if any(ex in domain for ex in EXCLUDED_DOMAINS):
+                continue
 
-    return AnalyzeResponse(status="success", competitors=competitors)
+            if domain in seen_domains:
+                continue
+            seen_domains.add(domain)
+
+            name = _clean_company_name(res["title"])
+            snippet = res["snippet"]
+
+            try:
+                sentiment = analyze_sentiment([snippet]) if snippet else 0.0
+            except Exception as e:
+                print(f"[Synapse] Sentiment analysis failed: {e}")
+                sentiment = 0.1
+
+            prices = _generate_deterministic_prices(url)
+            fallback_price = prices[-1]
+
+            try:
+                min_price, max_price = await extract_pricing_tiers(url, default_price=fallback_price)
+            except Exception as e:
+                print(f"[Synapse] Price extraction failed: {e}")
+                min_price, max_price = fallback_price, fallback_price
+            
+            current_price = min_price
+            
+            try:
+                predicted_price = predict_next_price(prices)
+            except Exception as e:
+                print(f"[Synapse] Price prediction failed: {e}")
+                predicted_price = current_price
+
+            row_id = str(uuid.uuid4())
+            row = {
+                "id": row_id,
+                "business_niche": niche,
+                "company_name": name,
+                "website_url": url,
+                "current_price": current_price,
+                "min_price": min_price,
+                "max_price": max_price,
+                "sentiment_score": sentiment,
+                "predicted_next_price": predicted_price,
+                "historical_prices": prices,
+            }
+
+            rows_to_insert.append(row)
+            competitors.append(CompetitorResult(**row))
+
+        print(f"[Synapse] Processed {len(competitors)} unique competitors")
+
+        # 3. Write to Supabase (non-fatal — still return data if DB fails)
+        if rows_to_insert:
+            try:
+                supabase.table("competitor_metrics").insert(rows_to_insert).execute()
+                print(f"[Synapse] Successfully wrote {len(rows_to_insert)} rows to Supabase")
+            except Exception as exc:
+                print(f"[Synapse] WARNING: Supabase insert failed: {exc}")
+                # Don't crash — still return the competitor data to the frontend
+
+        return AnalyzeResponse(status="success", competitors=competitors)
+        
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(f"[Synapse] CRITICAL ERROR in /api/analyze: {tb}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 
 @app.get("/api/metrics")
@@ -520,59 +521,4 @@ async def get_launchpad_blueprint(niche: str):
     )
 
 
-@app.get("/api/launchpad/{niche}", response_model=LaunchpadResponse)
-async def get_launchpad_blueprint(niche: str):
-    """
-    Generate an active business deployment plan based on current competitor intelligence.
-    """
-    # 1. Query competitors for this niche
-    try:
-        res = supabase.table("competitor_metrics").select("*").ilike("business_niche", niche).execute()
-        competitors_data = res.data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch competitors: {str(e)}")
-
-    if not competitors_data:
-        raise HTTPException(status_code=404, detail="No competitors found for this niche. Analyze it first.")
-
-    # 2. Calculate averages
-    avg_price = sum(c["current_price"] for c in competitors_data) / len(competitors_data)
-    avg_sentiment = sum(c["sentiment_score"] for c in competitors_data) / len(competitors_data)
-
-    # 3. Calculate Recommended Entry Price (Rule-based)
-    if avg_sentiment < 0:
-        # Market hates current offerings. Position as premium.
-        recommended_price = avg_price * 1.10
-    else:
-        # Market likes current offerings. Position as disruptive.
-        recommended_price = avg_price * 0.85
-
-    # 4. Keyword matching for industry template
-    niche_lower = niche.lower()
-    category = "saas" # default
-    if any(k in niche_lower for k in ["app", "software", "saas", "platform"]):
-        category = "saas"
-    elif any(k in niche_lower for k in ["shop", "store", "ecommerce", "product", "physical"]):
-        category = "ecommerce"
-    elif any(k in niche_lower for k in ["agency", "service", "consulting", "marketing"]):
-        category = "agency"
-
-    # Fetch checklist from DB
-    try:
-        template_res = supabase.table("industry_templates").select("steps_json").eq("category_keyword", category).execute()
-        if template_res.data:
-            checklist = template_res.data[0]["steps_json"]
-        else:
-            checklist = ["Validate MVP", "Launch"] # Fallback
-    except Exception as e:
-        checklist = ["Validate MVP", "Launch"]
-
-    return LaunchpadResponse(
-        niche=niche,
-        avg_market_price=round(avg_price, 2),
-        avg_sentiment=round(avg_sentiment, 4),
-        recommended_entry_price=round(recommended_price, 2),
-        competitors=competitors_data,
-        checklist=checklist
-    )
 
