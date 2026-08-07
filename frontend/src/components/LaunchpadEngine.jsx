@@ -24,7 +24,7 @@ export default function LaunchpadEngine({ activeNiche }) {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/launchpad/${encodeURIComponent(activeNiche)}`);
+      const res = await fetch(`https://synapse-multiagent-system.onrender.com/api/launchpad/${encodeURIComponent(activeNiche)}`);
       if (!res.ok) {
         throw new Error('Failed to fetch launchpad blueprint. Ensure you have competitors analyzed first.');
       }
@@ -42,7 +42,7 @@ export default function LaunchpadEngine({ activeNiche }) {
 
   const calculateBreakEven = async (price, fixed, variable) => {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/calculate-breakeven', {
+      const res = await fetch('https://synapse-multiagent-system.onrender.com/api/calculate-breakeven', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
