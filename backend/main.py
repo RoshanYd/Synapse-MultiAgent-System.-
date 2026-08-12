@@ -135,11 +135,6 @@ def scrape_duckduckgo(query: str, max_results: int = 5) -> list[dict]:
     except Exception as e:
         print(f"[Synapse] DuckDuckGo request failed or blocked (likely due to cloud IP): {e}")
 
-    # Fallback to niche-aware deterministic data if DDG blocked the Render IP
-    if not results:
-        print(f"[Synapse] Using niche-aware fallback data for: {query}")
-        results = _generate_niche_fallback(query, max_results)
-
     return results
 
 
@@ -334,14 +329,15 @@ async def analyze_niche(request: AnalyzeRequest):
         rows_to_insert: list[dict] = []
 
         # 1. LIVE SEARCH: Scrape real competitors from DuckDuckGo
-        search_query = f"{niche} software -top -best -list -review"
+        # Use natural search phrasing, rely on the strict Python filter below for exact matching
+        search_query = f"top {niche} business software platforms"
         print(f"[Synapse] Searching DuckDuckGo for: {search_query}")
         
         search_results = scrape_duckduckgo(search_query, max_results=15)
         print(f"[Synapse] Found {len(search_results)} raw results")
 
         if not search_results:
-            search_query = f"{niche} platform -top -best"
+            search_query = f"best {niche} companies"
             print(f"[Synapse] Retrying with: {search_query}")
             search_results = scrape_duckduckgo(search_query, max_results=15)
             print(f"[Synapse] Retry found {len(search_results)} results")
@@ -375,6 +371,17 @@ async def analyze_niche(request: AnalyzeRequest):
 
             if domain in seen_domains:
                 continue
+                
+            # STRICT RELEVANCY FILTER
+            # Discard results that don't contain any niche keywords in title/snippet
+            niche_words = [w.lower() for w in niche.split() if len(w) > 2]
+            if not niche_words:
+                niche_words = [niche.lower()]
+                
+            title_snippet_lower = (res.get("title", "") + " " + res.get("snippet", "")).lower()
+            if not any(word in title_snippet_lower for word in niche_words):
+                continue
+
             seen_domains.add(domain)
 
             name = _clean_company_name(res["title"])
