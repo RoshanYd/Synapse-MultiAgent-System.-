@@ -1073,4 +1073,90 @@ async def get_launchpad_blueprint(niche: str, auth_data: tuple[Client, str] = De
     )
 
 
+# ---------------------------------------------------------------------------
+# User Profile Endpoints
+# ---------------------------------------------------------------------------
 
+class ProfileSetupRequest(BaseModel):
+    username: str
+
+class UsernameUpdateRequest(BaseModel):
+    username: str
+
+
+@app.post("/api/profile/setup")
+async def setup_profile(req: ProfileSetupRequest, auth_data: tuple[Client, str] = Depends(get_user_client)):
+    """Create a new user profile with the chosen username right after sign-up."""
+    user_client, user_id = auth_data
+    username = req.username.strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="Username cannot be empty.")
+    
+    try:
+        user_client.table("user_profiles").insert({
+            "user_id": user_id,
+            "username": username,
+        }).execute()
+        return {"status": "success", "username": username}
+    except Exception as exc:
+        error_msg = str(exc)
+        if "duplicate" in error_msg.lower() or "unique" in error_msg.lower():
+            raise HTTPException(status_code=409, detail="This username is already taken. Please choose another.")
+        raise HTTPException(status_code=500, detail=f"Failed to create profile: {error_msg}")
+
+
+@app.get("/api/profile")
+async def get_profile(auth_data: tuple[Client, str] = Depends(get_user_client)):
+    """Get the current user's profile data."""
+    user_client, user_id = auth_data
+    try:
+        res = user_client.table("user_profiles").select("*").eq("user_id", user_id).execute()
+        if not res.data:
+            return {"status": "no_profile", "profile": None}
+        return {"status": "success", "profile": res.data[0]}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch profile: {str(exc)}")
+
+
+@app.put("/api/profile/username")
+async def update_username(req: UsernameUpdateRequest, auth_data: tuple[Client, str] = Depends(get_user_client)):
+    """
+    Update the user's username. Rate limited to 2 changes per rolling 24 hours.
+    """
+    user_client, user_id = auth_data
+    new_username = req.username.strip()
+    if not new_username:
+        raise HTTPException(status_code=400, detail="Username cannot be empty.")
+
+    # 1. Check rate limit: count changes in the last 24 hours
+    from datetime import datetime, timedelta, timezone
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    
+    try:
+        changes_res = user_client.table("username_changes").select("id").eq("user_id", user_id).gte("changed_at", cutoff).execute()
+        change_count = len(changes_res.data) if changes_res.data else 0
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to check rate limit: {str(exc)}")
+
+    if change_count >= 2:
+        raise HTTPException(
+            status_code=429,
+            detail="You can edit your profile name only twice a day. Come back after 24 hours."
+        )
+
+    # 2. Update the username
+    try:
+        user_client.table("user_profiles").update({"username": new_username}).eq("user_id", user_id).execute()
+    except Exception as exc:
+        error_msg = str(exc)
+        if "duplicate" in error_msg.lower() or "unique" in error_msg.lower():
+            raise HTTPException(status_code=409, detail="This username is already taken. Please choose another.")
+        raise HTTPException(status_code=500, detail=f"Failed to update username: {error_msg}")
+
+    # 3. Log the change for rate limiting
+    try:
+        user_client.table("username_changes").insert({"user_id": user_id}).execute()
+    except Exception as exc:
+        print(f"[Synapse] Warning: Failed to log username change: {exc}")
+
+    return {"status": "success", "username": new_username}

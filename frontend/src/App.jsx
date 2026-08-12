@@ -302,12 +302,118 @@ function ReportsView({ competitors }) {
 }
 
 function SettingsView() {
+  const { accessToken } = useAuth();
+  const [profile, setProfile] = useState(null);
+  const [newUsername, setNewUsername] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    if (accessToken) {
+      fetch('https://synapse-multiagent-system.onrender.com/api/profile', {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success' && data.profile) {
+          setProfile(data.profile);
+          setNewUsername(data.profile.username);
+        }
+      })
+      .catch(err => console.error("Failed to load profile", err));
+    }
+  }, [accessToken]);
+
+  const handleUpdateUsername = async (e) => {
+    e.preventDefault();
+    if (!newUsername.trim() || newUsername === profile?.username) return;
+    
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    
+    try {
+      const res = await fetch('https://synapse-multiagent-system.onrender.com/api/profile/username', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ username: newUsername.trim() })
+      });
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.detail || 'Failed to update username');
+      }
+      
+      setSuccess('Username updated successfully!');
+      setProfile(prev => ({ ...prev, username: data.username }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-12">
       <div>
         <h2 className="text-2xl font-bold text-white">Settings</h2>
-        <p className="text-sm text-slate-400 mt-1">Platform configuration & engine diagnostics</p>
+        <p className="text-sm text-slate-400 mt-1">Platform configuration & profile management</p>
       </div>
+      
+      {/* Profile Settings */}
+      <div className="glass-card p-6 max-w-2xl">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+            <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+          </div>
+          <h3 className="text-lg font-bold text-white">User Profile</h3>
+        </div>
+        
+        <form onSubmit={handleUpdateUsername} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              Username
+            </label>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                placeholder="Your username"
+                className="flex-1 px-4 py-2 bg-slate-800/60 border border-slate-700/50 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-purple-500/60 focus:ring-2 focus:ring-purple-500/20 transition-all text-sm"
+              />
+              <button
+                type="submit"
+                disabled={loading || newUsername === profile?.username}
+                className="px-6 py-2 bg-purple-500 hover:bg-purple-600 disabled:opacity-50 disabled:hover:bg-purple-500 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-purple-500/20"
+              >
+                {loading ? 'Saving...' : 'Update'}
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mt-2">
+              You can change your username up to 2 times every 24 hours.
+            </p>
+          </div>
+
+          {error && (
+            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center gap-2 animate-fade-in">
+              <svg className="w-5 h-5 text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" /></svg>
+              <span className="text-red-300 text-sm">{error}</span>
+            </div>
+          )}
+          {success && (
+            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-2 animate-fade-in">
+              <svg className="w-5 h-5 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <span className="text-emerald-300 text-sm">{success}</span>
+            </div>
+          )}
+        </form>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="glass-card p-6">
           <div className="flex items-center gap-3 mb-6">

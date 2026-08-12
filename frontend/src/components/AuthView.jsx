@@ -14,6 +14,7 @@ export default function AuthView() {
   const [viewState, setViewState] = useState('signIn');
   
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
@@ -26,6 +27,7 @@ export default function AuthView() {
     setError('');
     setSuccess('');
     setEmail('');
+    setUsername('');
     setPassword('');
     setConfirmPassword('');
   };
@@ -86,9 +88,15 @@ export default function AuthView() {
       return;
     }
 
-    if (viewState === 'signUp' && password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
+    if (viewState === 'signUp') {
+      if (!username.trim()) {
+        setError('Please enter a username.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match.');
+        return;
+      }
     }
 
     if (password.length < 6) {
@@ -99,8 +107,24 @@ export default function AuthView() {
     setLoading(true);
     try {
       if (viewState === 'signUp') {
-        await signUp(email.trim(), password);
-        setSuccess('Account created! You are now signed in.');
+        const data = await signUp(email.trim(), password);
+        const token = data?.session?.access_token;
+        if (token) {
+          // Setup profile with backend
+          await fetch('https://synapse-multiagent-system.onrender.com/api/profile/setup', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ username: username.trim() })
+          });
+          // Immediately log out to force them to log in again
+          await signOut();
+        }
+        // Force the user to sign in
+        handleToggleView('signIn');
+        setSuccess('Account created! Please sign in with your new credentials.');
       } else {
         await signIn(email.trim(), password);
       }
@@ -131,9 +155,7 @@ export default function AuthView() {
         <div className="text-center mb-8 animate-fade-in">
           <div className="inline-flex items-center gap-3 mb-4">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-electric-blue to-emerald-accent flex items-center justify-center shadow-lg shadow-electric-blue/20">
-              <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
-              </svg>
+              <img src="/logo.svg" alt="Synapse" className="w-8 h-8" />
             </div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
               Synapse
@@ -229,6 +251,31 @@ export default function AuthView() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@example.com"
+                    required
+                    className="w-full pl-11 pr-4 py-3 bg-slate-800/60 border border-slate-700/50 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-electric-blue/60 focus:ring-2 focus:ring-electric-blue/20 transition-all text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Username Field (Sign Up only) */}
+            {viewState === 'signUp' && !recoveryMode && (
+              <div className="animate-fade-in">
+                <label htmlFor="auth-username" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  Username
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                    <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                    </svg>
+                  </div>
+                  <input
+                    id="auth-username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Choose a username"
                     required
                     className="w-full pl-11 pr-4 py-3 bg-slate-800/60 border border-slate-700/50 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-electric-blue/60 focus:ring-2 focus:ring-electric-blue/20 transition-all text-sm"
                   />
