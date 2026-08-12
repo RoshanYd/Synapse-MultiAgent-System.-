@@ -406,6 +406,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState('dashboard');
   const [dashboardTab, setDashboardTab] = useState('intelligence'); // 'intelligence' | 'launchpad'
   const [selectedNiche, setSelectedNiche] = useState(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // -----------------------------------------------------------------------
   // Fetch existing data on mount
@@ -650,15 +651,31 @@ export default function App() {
   // Render
   // -----------------------------------------------------------------------
   return (
-    <div className="flex min-h-screen bg-slate-950">
+    <div className="flex flex-col md:flex-row min-h-screen bg-slate-950">
       {/* Persistent Sidebar */}
-      <Sidebar activeView={currentView} onViewChange={setCurrentView} />
+      <Sidebar 
+        activeView={currentView} 
+        onViewChange={(v) => { setCurrentView(v); setIsMobileMenuOpen(false); }} 
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
+      />
+
+      {/* Mobile Header */}
+      <div className="md:hidden flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-30">
+        <div className="flex items-center gap-2">
+          <img src="/logo.svg" alt="Synapse" className="w-8 h-8" />
+          <h1 className="text-sm font-bold text-white tracking-wide">SYNAPSE</h1>
+        </div>
+        <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-slate-400 hover:text-white">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+      </div>
 
       {/* Main Workspace */}
-      <main className="flex-1 ml-64 p-6 lg:p-8 max-w-[1400px]">
+      <main className="flex-1 md:ml-64 p-4 sm:p-6 lg:p-8 max-w-[1400px] w-full overflow-x-hidden">
         {/* Header */}
-        <header className="mb-8 animate-fade-in">
-          <div className="flex items-center justify-between">
+        <header className="mb-6 md:mb-8 animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-white capitalize">
                 {currentView}
@@ -671,7 +688,7 @@ export default function App() {
                 {currentView === 'about' && 'The vision and architecture behind Synapse'}
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 self-start sm:self-auto">
               <div className="px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/30">
                 <span className="text-xs text-slate-400">Source: </span>
                 <span className="text-xs font-semibold text-electric-blue">DuckDuckGo Live</span>

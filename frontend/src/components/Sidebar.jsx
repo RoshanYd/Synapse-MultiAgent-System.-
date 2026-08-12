@@ -89,9 +89,27 @@ function SynapseLogo() {
   );
 }
 
-export default function Sidebar({ activeView, onViewChange }) {
+export default function Sidebar({ activeView, onViewChange, isMobileMenuOpen, setIsMobileMenuOpen }) {
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-slate-900/80 backdrop-blur-xl border-r border-slate-700/40 flex flex-col z-50">
+    <>
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-40 md:hidden animate-fade-in" 
+          onClick={() => setIsMobileMenuOpen?.(false)} 
+        />
+      )}
+      
+      <aside className={`fixed left-0 top-0 h-screen w-64 bg-slate-900/95 backdrop-blur-xl border-r border-slate-700/40 flex flex-col z-50 transition-transform duration-300 ease-in-out md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
+        
+        {/* Close Button on Mobile */}
+        <button 
+          onClick={() => setIsMobileMenuOpen?.(false)} 
+          className="md:hidden absolute top-6 right-4 text-slate-400 hover:text-white transition-colors p-1"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+
       {/* Brand */}
       <div className="px-6 py-6 border-b border-slate-700/30">
         <div className="flex items-center gap-3">
@@ -136,5 +154,6 @@ export default function Sidebar({ activeView, onViewChange }) {
         <p className="text-[10px] text-slate-600 mt-1.5">v2.0.0 · Live Scraping · No LLMs</p>
       </div>
     </aside>
+    </>
   );
 }

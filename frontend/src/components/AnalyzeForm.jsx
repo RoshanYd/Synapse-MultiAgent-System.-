@@ -71,7 +71,7 @@ export default function AnalyzeForm({ onAnalysisStart, onAnalysisComplete, onErr
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex gap-3">
+      <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1 relative">
           <input
             id="niche-input"
