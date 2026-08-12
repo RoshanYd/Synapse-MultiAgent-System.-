@@ -11,6 +11,7 @@ from urllib.parse import urlparse, unquote
 
 import httpx
 from bs4 import BeautifulSoup
+from duckduckgo_search import DDGS
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -110,55 +111,27 @@ HEADERS = {
 
 def scrape_duckduckgo(query: str, max_results: int = 5) -> list[dict]:
     """
-    Scrape DuckDuckGo HTML search results directly.
+    Scrape DuckDuckGo search results using duckduckgo_search library.
     Returns a list of dicts with keys: title, url, snippet.
     """
-    search_url = "https://html.duckduckgo.com/html/"
     results = []
     
     try:
-        resp = httpx.post(
-            search_url,
-            data={"q": query, "b": ""},
-            headers=HEADERS,
-            timeout=15.0,
-            follow_redirects=True,
-        )
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
-        
-        # DuckDuckGo HTML results are in <div class="result"> blocks
-        for result_div in soup.select(".result"):
-            if len(results) >= max_results:
-                break
-    
-            # Extract title
-            title_tag = result_div.select_one(".result__title .result__a")
-            if not title_tag:
-                continue
-            title = title_tag.get_text(strip=True)
-    
-            # Extract URL — DDG wraps URLs in a redirect, actual URL is in the href param
-            raw_href = title_tag.get("href", "")
-            url = _extract_real_url(raw_href)
-            if not url or not url.startswith("http"):
-                continue
-    
-            # Extract snippet
-            snippet_tag = result_div.select_one(".result__snippet")
-            snippet = snippet_tag.get_text(strip=True) if snippet_tag else ""
-    
-            # Skip DuckDuckGo's own pages or ad results
-            parsed = urlparse(url)
-            if "duckduckgo.com" in parsed.netloc:
-                continue
-    
-            results.append({
-                "title": title,
-                "url": url,
-                "snippet": snippet,
-            })
-            
+        with DDGS() as ddgs:
+            ddgs_results = list(ddgs.text(query, max_results=max_results))
+            for r in ddgs_results:
+                url = r.get("href", "")
+                
+                # Skip DuckDuckGo's own pages or ad results
+                parsed = urlparse(url)
+                if "duckduckgo.com" in parsed.netloc:
+                    continue
+                    
+                results.append({
+                    "title": r.get("title", ""),
+                    "url": url,
+                    "snippet": r.get("body", ""),
+                })
     except Exception as e:
         print(f"[Synapse] DuckDuckGo request failed or blocked (likely due to cloud IP): {e}")
 
