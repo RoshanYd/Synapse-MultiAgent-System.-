@@ -4,10 +4,12 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 const API_BASE = 'https://synapse-multiagent-system.onrender.com';
 
 export default function AnalyzeForm({ onAnalysisStart, onAnalysisComplete, onError }) {
+  const { accessToken } = useAuth();
   const [niche, setNiche] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingText, setLoadingText] = useState('Analyzing...');
@@ -43,7 +45,10 @@ export default function AnalyzeForm({ onAnalysisStart, onAnalysisComplete, onErr
     try {
       const response = await fetch(`${API_BASE}/api/analyze`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({ niche: trimmed }),
       });
 

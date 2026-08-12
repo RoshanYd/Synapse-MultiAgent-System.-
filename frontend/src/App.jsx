@@ -6,11 +6,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ZAxis } from 'recharts';
 import { supabase } from './supabaseClient';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import AuthView from './components/AuthView';
 import Sidebar from './components/Sidebar';
 import AnalyzeForm from './components/AnalyzeForm';
 import MetricsCards from './components/MetricsCards';
 import CompetitorTable from './components/CompetitorTable';
 import LaunchpadEngine from './components/LaunchpadEngine';
+import html2pdf from 'html2pdf.js';
 
 // ---------------------------------------------------------------------------
 // Placeholder views for non-Dashboard tabs
@@ -229,13 +232,40 @@ function AnalyticsView({ competitors, onResetAnalytics, selectedNiche, searchedN
 
 function ReportsView({ competitors }) {
   const niches = [...new Set(competitors.map(c => c.business_niche))];
+
+  const handleExportPDF = () => {
+    const element = document.getElementById('reports-container');
+    if (!element) return;
+    
+    // Add a temporary class or style if needed for printing, but html2pdf handles it well.
+    const opt = {
+      margin:       0.5,
+      filename:     'synapse-niche-reports.pdf',
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, logging: false },
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'landscape' }
+    };
+    
+    html2pdf().set(opt).from(element).save();
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h2 className="text-2xl font-bold text-white">Reports</h2>
-        <p className="text-sm text-slate-400 mt-1">Summary reports of your competitor intelligence</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Reports</h2>
+          <p className="text-sm text-slate-400 mt-1">Summary reports of your competitor intelligence</p>
+        </div>
+        <button
+          onClick={handleExportPDF}
+          disabled={niches.length === 0}
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-electric-blue to-emerald-accent text-white font-semibold rounded-lg shadow-lg hover:shadow-electric-blue/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+          Export to PDF
+        </button>
       </div>
-      <div className="glass-card p-6">
+      <div id="reports-container" className="glass-card p-6">
         <h3 className="text-sm font-semibold text-white mb-4">Niche Summary Reports</h3>
         {niches.length === 0 ? (
           <p className="text-slate-500 text-sm">No reports available. Analyze a niche from the Dashboard to generate reports.</p>
@@ -399,7 +429,8 @@ function AboutView() {
 // ---------------------------------------------------------------------------
 // Main App
 // ---------------------------------------------------------------------------
-export default function App() {
+function AppContent() {
+  const { user, accessToken, signOut } = useAuth();
   const [competitors, setCompetitors] = useState([]);
   const [notification, setNotification] = useState(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -407,6 +438,13 @@ export default function App() {
   const [dashboardTab, setDashboardTab] = useState('intelligence'); // 'intelligence' | 'launchpad'
   const [selectedNiche, setSelectedNiche] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Helper to build headers with the JWT token
+  const authHeaders = useCallback((extra = {}) => ({
+    'Content-Type': 'application/json',
+    ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+    ...extra,
+  }), [accessToken]);
 
   // -----------------------------------------------------------------------
   // Fetch existing data on mount
@@ -491,7 +529,7 @@ export default function App() {
   // Delete handlers
   const handleDeleteOne = useCallback(async (id) => {
     try {
-      const resp = await fetch(`https://synapse-multiagent-system.onrender.com/api/competitors/${id}`, { method: 'DELETE' });
+      const resp = await fetch(`https://synapse-multiagent-system.onrender.com/api/competitors/${id}`, { method: 'DELETE', headers: authHeaders() });
       if (!resp.ok) throw new Error('Delete failed');
       setCompetitors(prev => prev.filter(c => c.id !== id));
       showNotification('Competitor record deleted.', 'success');
@@ -504,7 +542,7 @@ export default function App() {
     try {
       const resp = await fetch('https://synapse-multiagent-system.onrender.com/api/competitors/bulk-delete', { 
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ ids })
       });
       if (!resp.ok) throw new Error('Bulk delete failed');
@@ -517,7 +555,7 @@ export default function App() {
 
   const handleDeleteAll = useCallback(async () => {
     try {
-      const resp = await fetch('https://synapse-multiagent-system.onrender.com/api/competitors/delete-all', { method: 'POST' });
+      const resp = await fetch('https://synapse-multiagent-system.onrender.com/api/competitors/delete-all', { method: 'POST', headers: authHeaders() });
       if (!resp.ok) throw new Error('Delete all failed');
       setCompetitors([]);
       showNotification('All competitor records have been purged.', 'success');
@@ -528,7 +566,7 @@ export default function App() {
 
   const handleResetAnalytics = useCallback(async () => {
     try {
-      const resp = await fetch('https://synapse-multiagent-system.onrender.com/api/competitors/delete-all', { method: 'POST' });
+      const resp = await fetch('https://synapse-multiagent-system.onrender.com/api/competitors/delete-all', { method: 'POST', headers: authHeaders() });
       if (!resp.ok) throw new Error('Reset failed');
       setCompetitors([]);
       showNotification('Analytics data has been reset.', 'success');
@@ -688,15 +726,21 @@ export default function App() {
                 {currentView === 'about' && 'The vision and architecture behind Synapse'}
               </p>
             </div>
-            <div className="flex items-center gap-3 self-start sm:self-auto">
+            <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
               <div className="px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/30">
                 <span className="text-xs text-slate-400">Source: </span>
                 <span className="text-xs font-semibold text-electric-blue">DuckDuckGo Live</span>
               </div>
-              <div className="px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/30">
-                <span className="text-xs text-slate-400">LLMs: </span>
-                <span className="text-xs font-semibold text-red-400">None</span>
+              <div className="px-3 py-1.5 rounded-lg bg-slate-800/60 border border-slate-700/30 truncate max-w-[200px]" title={user?.email}>
+                <span className="text-xs text-slate-400">User: </span>
+                <span className="text-xs font-semibold text-emerald-accent">{user?.email}</span>
               </div>
+              <button
+                onClick={signOut}
+                className="px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
+              >
+                Sign Out
+              </button>
             </div>
           </div>
         </header>
@@ -753,3 +797,29 @@ export default function App() {
   );
 }
 
+// Wrap the App with AuthProvider and gate behind authentication
+export default function App() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-slate-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-3 border-emerald-accent/20 border-t-emerald-accent rounded-full animate-spin" />
+          <p className="text-sm text-slate-400 font-medium">Loading Synapse…</p>
+        </div>
+      </div>
+    );
+  }
+
+  return user ? <AppContent /> : <AuthView />;
+}
+
+// Root wrapper that provides AuthContext
+export function AppWrapper() {
+  return (
+    <AuthProvider>
+      <App />
+    </AuthProvider>
+  );
+}

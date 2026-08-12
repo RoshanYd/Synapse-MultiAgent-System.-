@@ -7,6 +7,8 @@ Synapse Analytics Engine is a deterministic, AI-augmented business intelligence 
 - **Lexical Sentiment (NLTK)**: Objective polarity scoring of competitor web messaging using VADER sentiment analysis.
 - **Predictive Pricing (ML)**: Forecasts competitor pricing trajectories based on simulated historical time-series data using Scikit-Learn linear regression.
 - **Rule-Based Strategy**: Formulates precise market entry recommendations using an internal deterministic SWOT engine.
+- **Global Niche Compatibility**: Advanced Wikipedia entity fallback and smart fuzzy matching ensure that *every* niche (popular or unpopular) returns 100% relevant, real business results without domain parking spam.
+- **Responsive Architecture**: Fully mobile-responsive UI with auto-scaling grids and slide-out navigation tailored for all devices (desktop, tablet, mobile).
 - **Data Persistence**: Backed by a high-performance PostgreSQL (Supabase) database with real-time UI synchronization.
 
 ## Architecture & Tech Stack

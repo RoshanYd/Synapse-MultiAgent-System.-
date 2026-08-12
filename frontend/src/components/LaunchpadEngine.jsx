@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ZAxis } from 'recharts';
+import { useAuth } from '../context/AuthContext';
 
 export default function LaunchpadEngine({ activeNiche }) {
+  const { accessToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
@@ -24,7 +26,11 @@ export default function LaunchpadEngine({ activeNiche }) {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`https://synapse-multiagent-system.onrender.com/api/launchpad/${encodeURIComponent(activeNiche)}`);
+      const res = await fetch(`https://synapse-multiagent-system.onrender.com/api/launchpad/${encodeURIComponent(activeNiche)}`, {
+        headers: {
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+        },
+      });
       if (!res.ok) {
         throw new Error('Failed to fetch launchpad blueprint. Ensure you have competitors analyzed first.');
       }
@@ -44,7 +50,10 @@ export default function LaunchpadEngine({ activeNiche }) {
     try {
       const res = await fetch('https://synapse-multiagent-system.onrender.com/api/calculate-breakeven', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({
           recommended_price: Number(price),
           fixed_costs: Number(fixed),

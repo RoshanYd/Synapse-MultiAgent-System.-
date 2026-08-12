@@ -14,10 +14,10 @@ from bs4 import BeautifulSoup
 from duckduckgo_search import DDGS
 from googlesearch import search
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from supabase import create_client, Client
+from supabase import create_client, Client, ClientOptions
 
 from analytics import analyze_sentiment, predict_next_price, extract_pricing_tiers, generate_swot
 
@@ -36,6 +36,24 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     )
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# ---------------------------------------------------------------------------
+# Auth Dependency
+# ---------------------------------------------------------------------------
+def get_user_client(authorization: str = Header(None)) -> tuple[Client, str]:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    token = authorization.split(" ")[1]
+    
+    # Create a user-specific client that will respect RLS
+    options = ClientOptions(headers={"Authorization": f"Bearer {token}"})
+    user_client = create_client(SUPABASE_URL, SUPABASE_KEY, options=options)
+    
+    try:
+        user_resp = user_client.auth.get_user(jwt=token)
+        return user_client, user_resp.user.id
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid or expired token: {str(e)}")
 
 # ---------------------------------------------------------------------------
 # FastAPI application
@@ -587,11 +605,12 @@ async def root():
 
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
-async def analyze_niche(request: AnalyzeRequest):
+async def analyze_niche(request: AnalyzeRequest, auth_data: tuple[Client, str] = Depends(get_user_client)):
     """
     Analyze a business niche: LIVE Web scraping via DuckDuckGo HTML.
     Extracts top URLs, parses text for sentiment, predicts pricing via pure math.
     """
+    user_client, user_id = auth_data
     import traceback
     
     try:
@@ -872,8 +891,12 @@ async def analyze_niche(request: AnalyzeRequest):
 
         # 4. Write to Supabase (non-fatal — still return data if DB fails)
         if rows_to_insert:
+            # Inject user_id into all rows for RLS
+            for row in rows_to_insert:
+                row["user_id"] = user_id
+
             try:
-                supabase.table("competitor_metrics").insert(rows_to_insert).execute()
+                user_client.table("competitor_metrics").insert(rows_to_insert).execute()
                 print(f"[Synapse] Successfully wrote {len(rows_to_insert)} rows to Supabase")
             except Exception as exc:
                 print(f"[Synapse] WARNING: Supabase insert failed: {exc}")
@@ -890,11 +913,12 @@ async def analyze_niche(request: AnalyzeRequest):
 
 
 @app.get("/api/metrics")
-async def get_all_metrics():
+async def get_all_metrics(auth_data: tuple[Client, str] = Depends(get_user_client)):
     """Retrieve all competitor metrics from the database."""
+    user_client, _ = auth_data
     try:
         response = (
-            supabase.table("competitor_metrics")
+            user_client.table("competitor_metrics")
             .select("*")
             .order("created_at", desc=True)
             .execute()
@@ -908,10 +932,11 @@ async def get_all_metrics():
 
 
 @app.delete("/api/competitors/{id}")
-async def delete_competitor(id: str):
+async def delete_competitor(id: str, auth_data: tuple[Client, str] = Depends(get_user_client)):
     """Delete a single competitor record by ID."""
+    user_client, _ = auth_data
     try:
-        supabase.table("competitor_metrics").delete().eq("id", id).execute()
+        user_client.table("competitor_metrics").delete().eq("id", id).execute()
         return {"status": "success", "message": f"Deleted competitor {id}"}
     except Exception as exc:
         raise HTTPException(
@@ -924,14 +949,15 @@ class BulkDeleteRequest(BaseModel):
     ids: list[str]
 
 @app.post("/api/competitors/bulk-delete")
-async def delete_competitors_bulk(req: BulkDeleteRequest):
+async def delete_competitors_bulk(req: BulkDeleteRequest, auth_data: tuple[Client, str] = Depends(get_user_client)):
     """Delete multiple competitor records by their IDs using POST to allow JSON body safely."""
+    user_client, _ = auth_data
     try:
         if not req.ids:
             return {"status": "success", "message": "No IDs provided"}
         
         # Supabase allows 'in_' for array filtering
-        supabase.table("competitor_metrics").delete().in_("id", req.ids).execute()
+        user_client.table("competitor_metrics").delete().in_("id", req.ids).execute()
         return {"status": "success", "message": f"Deleted {len(req.ids)} competitors"}
     except Exception as exc:
         raise HTTPException(
@@ -941,11 +967,12 @@ async def delete_competitors_bulk(req: BulkDeleteRequest):
 
 
 @app.delete("/api/competitors")
-async def delete_all_competitors():
+async def delete_all_competitors(auth_data: tuple[Client, str] = Depends(get_user_client)):
     """Delete ALL competitor records from the database."""
+    user_client, _ = auth_data
     try:
         # Supabase requires a filter, so we use a non-null id condition to match all rows
-        supabase.table("competitor_metrics").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+        user_client.table("competitor_metrics").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
         return {"status": "success", "message": "All competitor records deleted"}
     except Exception as exc:
         raise HTTPException(
@@ -985,13 +1012,14 @@ async def calculate_breakeven(req: BreakevenRequest):
 
 
 @app.get("/api/launchpad/{niche}", response_model=LaunchpadResponse)
-async def get_launchpad_blueprint(niche: str):
+async def get_launchpad_blueprint(niche: str, auth_data: tuple[Client, str] = Depends(get_user_client)):
     """
     Generate an active business deployment plan based on current competitor intelligence.
     """
+    user_client, _ = auth_data
     # 1. Query competitors for this niche
     try:
-        res = supabase.table("competitor_metrics").select("*").ilike("business_niche", niche).execute()
+        res = user_client.table("competitor_metrics").select("*").ilike("business_niche", niche).execute()
         competitors_data = res.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch competitors: {str(e)}")
