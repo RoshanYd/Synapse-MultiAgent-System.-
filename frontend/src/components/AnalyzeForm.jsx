@@ -3,13 +3,34 @@
  * Calls the FastAPI backend to trigger competitor analysis.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const API_BASE = 'https://synapse-multiagent-system.onrender.com';
 
 export default function AnalyzeForm({ onAnalysisStart, onAnalysisComplete, onError }) {
   const [niche, setNiche] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState('Analyzing...');
+
+  useEffect(() => {
+    let interval;
+    if (isLoading) {
+      const steps = [
+        "Initializing Engine...",
+        "Scraping Search Engines...",
+        "Running NLP Analysis...",
+        "Calculating Metrics...",
+        "Finalizing Data..."
+      ];
+      let i = 0;
+      setLoadingText(steps[0]);
+      interval = setInterval(() => {
+        i = (i + 1) % steps.length;
+        setLoadingText(steps[i]);
+      }, 1500);
+    }
+    return () => clearInterval(interval);
+  }, [isLoading]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -77,7 +98,7 @@ export default function AnalyzeForm({ onAnalysisStart, onAnalysisComplete, onErr
           {isLoading ? (
             <>
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Analyzing…
+              <span className="min-w-[140px] text-left">{loadingText}</span>
             </>
           ) : (
             <>
